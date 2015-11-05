@@ -118,7 +118,26 @@ try:
 		print("Sending %s to %s..." % (sys.argv[3], send_address))
 		print("(nonce: %s)" % nonce)
 
-		txid = bitcoin.sendtoaddress(send_address, Decimal(sys.argv[3]))
+		try:
+			tx_hex = bitcoin.createrawtransaction([], {send_address: Decimal(sys.argv[3])})
+			tx_hex = bitcoin.fundrawtransaction(tx_hex)['hex']
+			tx = bitcoin.signrawtransaction(tx_hex)
+			assert(tx['complete'])
+
+			tx_hex = tx['hex']
+
+			total_length  = len(tx_hex)/2
+			total_length += 14*32 # maximum length of spv proof 1MB blocks
+			total_length += 1000 # len(full_contract) + len(secondScriptPubKey) and rounded up to 1000
+
+			if total_length >= 10000:
+				print("Transaction is too large.")
+				exit(1)
+
+			txid = bitcoin.sendrawtransaction(tx_hex)
+		except:
+			txid = bitcoin.sendtoaddress(send_address, Decimal(sys.argv[3]))
+
 		print("Sent tx with id %s" % txid)
 	elif sys.argv[1] == "claim-on-sidechain":
 		if len(sys.argv) != 5:
@@ -162,7 +181,7 @@ try:
 		in_vout = utxo.in_vout
 		in_value = utxo.in_value
 
-		print("Redeeming from utxo %s:%.16g (value %.16g, refund %d)" % (in_txid, in_vout, in_value, in_value - value))
+		print("Redeeming from utxo %s:%.16g (value %.16g, refund %.16g)" % (in_txid, in_vout, in_value, in_value - value))
 
 		withdrawkeys = 'withdrawkeys:{"contract": "%s", "txoutproof": "%s", "tx": "%s", "nout": %d, "secondScriptPubKey": "%s", "secondScriptSig": "%s", "coinbase": "%s"}' % (full_contract, spv_proof, raw_bitcoin_tx_hex, nout, secondScriptPubKey, secondScriptSig, raw_coinbase_tx_hex)
 		out_scriptPubKey = "OP_IF %d 0x20%s %d 0 0x14%s 0x20%s OP_REORGPROOFVERIFY OP_ELSE 144 OP_NOP3 OP_DROP OP_HASH160 0x14%s OP_EQUAL OP_ENDIF" % (bitcoin_block["height"], sys.argv[4], nout, secondScriptPubKeyHash, inverse_bitcoin_genesis_hash, raw_dest)
