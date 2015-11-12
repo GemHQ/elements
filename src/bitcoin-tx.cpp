@@ -185,81 +185,91 @@ static void MutateTxLocktime(CMutableTransaction& tx, const string& cmdVal)
 
 static void MutateTxAddInput(CMutableTransaction& tx, const string& strInput)
 {
-    // separate TXID:VOUT in string
-    size_t pos = strInput.find(':');
-    if ((pos == string::npos) ||
-        (pos == 0) ||
-        (pos == (strInput.size() - 1)))
-        throw runtime_error("TX input missing separator");
-
-    // extract and validate TXID
-    string strTxid = strInput.substr(0, pos);
-    if ((strTxid.size() != 64) || !IsHex(strTxid))
-        throw runtime_error("invalid TX input txid");
-    uint256 txid(strTxid);
-
     static const unsigned int minTxOutSz = 9;
     static const unsigned int maxVout = MAX_BLOCK_SIZE / minTxOutSz;
 
-    // Remove txid
-    string strVout = strInput.substr(pos + 1, string::npos);
+    // strInput format is TXID:VOUT:VALUE:SEQUENCE[:ASSETID]
 
-    // extract and validate vout
+    // extract and validate TXID
+    const size_t lenTxid = strInput.find(':');
+    size_t pos = 0;
+
+    // if (lenTxid == 0): e.g strInput=":whateverdoesn'tmatter"
+    // this will be caught by TXID validation
+    //
+    // if (lenTxid == strInput.size() - 1): e.g. strInput="whateverwhatever:"
+    // this will be caught when we try to extract the value (of VOUT)
+    //
+    // So this is actually all we need to test for each mandatory variable.
+    if (lenTxid == string::npos)
+        throw runtime_error("invalid TX input: missing separator after TXID");
+
+    const string strTxid = strInput.substr(pos, lenTxid);
+    if ((strTxid.size() != 64) || !IsHex(strTxid))
+        throw runtime_error("invalid TX input: invalid TXID");
+    uint256 txid(strTxid);
+
+    // extract and validate VOUT
+    pos += lenTxid + 1;
+    const size_t lenVout = strInput.substr(pos, string::npos).find(':');
+    if (lenVout == string::npos)
+        throw runtime_error("invalid TX input: missing separator after VOUT");
+
+    const string strVout = strInput.substr(pos, lenVout);
     int vout = atoi(strVout);
     if ((vout < 0) || (vout > (int)maxVout))
-        throw runtime_error("invalid TX input vout");
-
-    // Remove vout
-    pos = strVout.find(':');
-    strVout = strVout.substr(pos + 1, string::npos);
+        throw runtime_error("invalid TX input: invalid VOUT");
 
     // extract and validate VALUE
-    pos = strVout.find(':');
-    if (pos == string::npos)
-        throw runtime_error("TX input missing separator");
-    string strValue = strVout.substr(0, pos);
+    pos += lenVout + 1;
+    size_t lenValue = strInput.substr(pos, string::npos).find(':');
+    if (lenValue == string::npos)
+        throw runtime_error("invalid TX input: missing separator after VALUE");
+
+    const string strValue = strInput.substr(pos, lenValue);
     CAmount value;
     if (!ParseMoney(strValue, value))
-        throw runtime_error("invalid TX output value");
+        throw runtime_error("invalid TX input: invalid VALUE");
 
-    CAssetID assetID = CAssetID(Params().HashGenesisBlock());
-    // extract and validate sequence number
+    // extract SEQUENCE and ASSETID
     uint32_t nSequence = ~(uint32_t)0;
-    pos = strVout.find(':');
-    if (pos != string::npos) {
-        if ((pos == 0) || (pos == (strVout.size() - 1)))
-            throw runtime_error("empty TX input field");
 
-        string strSeq = strVout.substr(pos + 1, string::npos);
-        size_t posAsset = strInput.find(':');
-        if (posAsset != string::npos && posAsset != 0 && posAsset != (strInput.size() - 1)) {
-            strSeq = strInput.substr(pos + 1, posAsset);
-            string strAsset = strInput.substr(posAsset + 1, string::npos);
-            assetID = CAssetID(uint256(strAsset));
-        }
+    pos += lenValue + 1;
+    const size_t lenSeq = strInput.substr(pos, string::npos).find(':');
 
-        strVout.resize(pos);
-        int64_t nSeq = atoi64(strSeq);
+    string strSeq;
+    CAssetID assetID;
 
-        // Allow e.g. -1 to be used for 0xffffffff
-        if (nSeq < 0)
-            nSeq += ((int64_t)std::numeric_limits<uint32_t>::max()) + 1;
-
-        // Range check
-        if (nSeq < std::numeric_limits<uint32_t>::min() ||
-            nSeq > std::numeric_limits<uint32_t>::max())
-        {
-            throw runtime_error("invalid TX input sequence");
-        }
-
-        nSequence = (uint32_t)nSeq;
+    if ((lenSeq == string::npos) ||
+        (lenSeq >= strInput.size() - 1)) { // no assetid given
+        strSeq = strInput.substr(pos, string::npos);
+        assetID = CAssetID(Params().HashGenesisBlock());
     } else {
-        throw runtime_error("invalid TX input: sequence missing");
+        strSeq = strInput.substr(pos, lenSeq);
+        pos += lenSeq + 1;
+        assetID  = CAssetID(uint256(strInput.substr(pos, string::npos)));
     }
+
+    int64_t nSeq = atoi64(strSeq);
+
+    // Allow e.g. -1 to be used for 0xffffffff
+    if (nSeq < 0)
+        nSeq += ((int64_t)std::numeric_limits<uint32_t>::max()) + 1;
+
+    // validate SEQUENCE
+    // Range check
+    if (nSeq < std::numeric_limits<uint32_t>::min() ||
+        nSeq > std::numeric_limits<uint32_t>::max())
+    {
+        throw runtime_error("invalid TX input: invalid SEQUENCE");
+    }
+
+    nSequence = (uint32_t)nSeq;
 
     CAmountMap mTxReward = CTransaction(tx).GetTxRewardMap();
     mTxReward[assetID] += value;
     tx.SetFeesFromTxRewardMap(mTxReward);
+
     // append to transaction input list
     CTxIn txin(txid, vout, CScript(), nSequence);
     tx.vin.push_back(txin);
@@ -267,32 +277,44 @@ static void MutateTxAddInput(CMutableTransaction& tx, const string& strInput)
 
 static void MutateTxAddOutAddr(CMutableTransaction& tx, const string& strInput)
 {
-    // separate VALUE:ADDRESS in string
-    size_t pos = strInput.find(':');
-    if ((pos == string::npos) ||
-        (pos == 0) ||
-        (pos == (strInput.size() - 1)))
+    // format is VALUE:ADDRESS[:ASSETID]
+    // find the first `:` which separates VALUE and ADDRESS
+    size_t posAddr = strInput.find(':');
+    if ((posAddr == string::npos) ||
+        (posAddr == 0) ||
+        (posAddr == (strInput.size() - 1)))
         throw runtime_error("TX output missing separator");
 
     // extract and validate VALUE
-    string strValue = strInput.substr(0, pos);
+    string strValue = strInput.substr(0, posAddr);
     CAmount value;
     if (!ParseMoney(strValue, value))
         throw runtime_error("invalid TX output value");
 
+    // check for the optional second `:` which separates ADDRESS and ASSETID
+    size_t posAsset = strInput.find(':', posAddr + 1);
+
     // extract and validate ADDRESS
-    string strAddr = strInput.substr(pos + 1, string::npos);
-    CAssetID assetID = CAssetID(Params().HashGenesisBlock());
-    size_t posAsset = strInput.find(':');
-    if (posAsset != string::npos && posAsset != 0 && posAsset != (strInput.size() - 1)) {
-        strAddr = strInput.substr(pos, posAsset);
-        string strAsset = strInput.substr(posAsset + 1, string::npos);
-        assetID = CAssetID(uint256(strAsset));
-    }
+    string strAddr = strInput.substr(posAddr + 1, max(posAsset - posAddr,
+                                                      posAddr - posAddr) - 1);
 
     CBitcoinAddress addr(strAddr);
     if (!addr.IsValid())
         throw runtime_error("invalid TX output address");
+
+    // extract ASSETID
+    CAssetID assetID;
+    string strAsset;
+    if ((posAsset != string::npos &&
+         posAsset != 0 &&
+         posAsset != (strInput.size() - 1))) {
+        strAsset = strInput.substr(posAsset + 1, string::npos);
+        assetID = CAssetID(uint256(strAsset));
+    } else {
+        // No ASSETID supplied, use the hash of the genesis block
+        // (which is the assetID of the hostcoin)
+        assetID = CAssetID(Params().HashGenesisBlock());
+    }
 
     // build standard output script via GetScriptForDestination()
     CScript scriptPubKey = GetScriptForDestination(addr.Get());
@@ -303,10 +325,11 @@ static void MutateTxAddOutAddr(CMutableTransaction& tx, const string& strInput)
         CPubKey pubkey = addr.GetBlindingKey();
         txout.nValue.vchNonceCommitment = std::vector<unsigned char>(pubkey.begin(), pubkey.end());
     }
+
     CAmountMap mTxReward = CTransaction(tx).GetTxRewardMap();
     mTxReward[assetID] -= value;
-    tx.SetFeesFromTxRewardMap(mTxReward);
     tx.vout.push_back(txout);
+    tx.SetFeesFromTxRewardMap(mTxReward);
 }
 
 static void MutateTxBlind(CMutableTransaction& tx, const string& strInput)
