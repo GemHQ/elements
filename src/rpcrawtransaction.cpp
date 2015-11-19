@@ -484,12 +484,6 @@ Value createrawtransaction(const Array& params, bool fHelp)
             "      \"address\": \"id\"  (string, optional) The key is the bitcoin address, the value is the asset id\n"
             "      ,...\n"
             "    }\n"
-            "3. \"output asset ids\"    (object, optional) a json object with addresses as keys and asset ids as values\n"
-            "                                              All addresses not contained here default to -feeasset\n"
-            "    {\n"
-            "      \"address\": \"id\"  (string, optional) The key is the bitcoin address, the value is the asset id\n"
-            "      ,...\n"
-            "    }\n"
             "4. Asset definition        (boolean, optional, default=false) Make it an asset definition transaction. Outputs with assetID = 0 will represent the newly issued assets.\n"
 
             "\nResult:\n"
