@@ -243,11 +243,14 @@ public:
         genesis.nTime = 1296688602;
         nDefaultPort = 18444;
 
+        // No need for a withdrawverify tx in genesis block right now
         CMutableTransaction txNew(genesis.vtx[0]);
-        txNew.vout.resize(2);
-        txNew.vout[0].nValue = MAX_MONEY / 2;
-        txNew.vout[1].nValue = MAX_MONEY / 2;
-        txNew.vout[1].scriptPubKey = CScript() << OP_TRUE;
+        txNew.vout.resize(1);
+        // txNew.vout.resize(2);
+        txNew.vout[0].nValue = MAX_MONEY; // make it raaaain
+        // txNew.vout[1].nValue = MAX_MONEY / 2;
+        // txNew.vout[1].scriptPubKey = CScript() << OP_TRUE;
+        txNew.vout[0].scriptPubKey = CScript() << OP_TRUE;
         genesis.vtx[0] = CTransaction(txNew);
 
         if (scriptDestination.empty()) {
