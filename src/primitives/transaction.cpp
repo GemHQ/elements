@@ -116,7 +116,7 @@ CAmountMap& operator-=(CAmountMap& a, const CAmountMap& b)
 
 std::string COutPoint::ToString() const
 {
-    return strprintf("COutPoint(%s, %u)", hash.ToString().substr(0,10), n);
+    return strprintf("COutPoint(%s, %u, %s)", hash.ToString().substr(0,10), n, assetID.ToString().substr(0,10));
 }
 
 CTxIn::CTxIn(COutPoint prevoutIn, CScript scriptSigIn, uint32_t nSequenceIn)
@@ -126,9 +126,9 @@ CTxIn::CTxIn(COutPoint prevoutIn, CScript scriptSigIn, uint32_t nSequenceIn)
     nSequence = nSequenceIn;
 }
 
-CTxIn::CTxIn(uint256 hashPrevTx, uint32_t nOut, CScript scriptSigIn, uint32_t nSequenceIn)
+CTxIn::CTxIn(uint256 hashPrevTx, uint32_t nOut, CScript scriptSigIn, uint32_t nSequenceIn, CAssetID assetIDIn)
 {
-    prevout = COutPoint(hashPrevTx, nOut);
+    prevout = COutPoint(hashPrevTx, nOut, assetIDIn);
     scriptSig = scriptSigIn;
     nSequence = nSequenceIn;
 }

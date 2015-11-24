@@ -74,6 +74,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
         else {
             in.push_back(Pair("txid", txin.prevout.hash.GetHex()));
             in.push_back(Pair("vout", (int64_t)txin.prevout.n));
+            in.push_back(Pair("assetID", txin.prevout.assetID.ToString()));
             Object o;
             o.push_back(Pair("asm", txin.scriptSig.ToString()));
             o.push_back(Pair("hex", HexStr(txin.scriptSig.begin(), txin.scriptSig.end())));
@@ -112,6 +113,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
             out.push_back(Pair("serValue", HexStr(ssValue.begin(), ssValue.end())));
         }
         out.push_back(Pair("n", (int64_t)i));
+        out.push_back(Pair("assetID", txout.assetID.ToString()));
         Object o;
         ScriptPubKeyToJSON(txout.scriptPubKey, o, true);
         out.push_back(Pair("scriptPubKey", o));
@@ -742,6 +744,7 @@ Value decoderawtransaction(const Array& params, bool fHelp)
             "     {\n"
             "       \"txid\": \"id\",    (string) The transaction id\n"
             "       \"vout\": n,         (numeric) The output number\n"
+            "       \"assetID\": n,      (string) The asset type this input spends\n"
             "       \"scriptSig\": {     (json object) The script\n"
             "         \"asm\": \"asm\",  (string) asm\n"
             "         \"hex\": \"hex\"   (string) hex\n"
@@ -754,6 +757,7 @@ Value decoderawtransaction(const Array& params, bool fHelp)
             "     {\n"
             "       \"value\" : x.xxx,            (numeric) The value in btc\n"
             "       \"n\" : n,                    (numeric) index\n"
+            "       \"assetID\": n,               (string) The asset type\n"
             "       \"scriptPubKey\" : {          (json object)\n"
             "         \"asm\" : \"asm\",          (string) the asm\n"
             "         \"hex\" : \"hex\",          (string) the hex\n"
