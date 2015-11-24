@@ -71,15 +71,37 @@ public:
     friend bool operator!=(const CTxOutValue& a, const CTxOutValue& b);
 };
 
+/**
+ *  Native Asset Issuance
+ *
+ *  An asset identifier tag, a 256 bits serialized hash (sha256) of the asset
+ *  definition transaction from which the output’s coins are derived. Each output contains
+ *  coins from a single asset/currency. For the host currency, the similarly-calculated
+ *  hash of the chain’s genesis block is used instead. Within an asset
+ *  definition transaction, the asset being defined is identified with 0 as a hash.
+ */
+typedef uint256 CAssetID;
+
+typedef std::map<CAssetID, CAmount> CAmountMap;
+
+bool operator<(const CAmountMap& a, const CAmountMap& b);
+CAmountMap& operator+=(CAmountMap& a, const CAmountMap& b);
+CAmountMap& operator-=(CAmountMap& a, const CAmountMap& b);
+
 /** An outpoint - a combination of a transaction hash and an index n into its vout */
 class COutPoint
 {
 public:
     uint256 hash;
     uint32_t n;
+    CAssetID assetID;
 
     COutPoint() { SetNull(); }
-    COutPoint(uint256 hashIn, uint32_t nIn) { hash = hashIn; n = nIn; }
+    COutPoint(uint256 hashIn, uint32_t nIn, CAssetID assetIDIn=CAssetID()) {
+        hash = hashIn;
+        n = nIn;
+        assetID = assetIDIn;
+    }
 
     ADD_SERIALIZE_METHODS;
 
@@ -88,14 +110,20 @@ public:
         READWRITE(FLATDATA(*this));
     }
 
-    void SetNull() { hash = 0; n = (uint32_t) -1; }
-    bool IsNull() const { return (hash == 0 && n == (uint32_t) -1); }
+    void SetNull() { hash = 0; n = (uint32_t) -1; assetID = CAssetID(); }
 
+    bool IsNull() const {
+        return (hash == 0 && n == (uint32_t) -1);
+    }
+
+    // TODO: No idea how asset type should affect `<`
     friend bool operator<(const COutPoint& a, const COutPoint& b)
     {
         return (a.hash < b.hash || (a.hash == b.hash && a.n < b.n));
     }
 
+    // I don't think assetID makes sense to compare here, since it's
+    // just a convenience value
     friend bool operator==(const COutPoint& a, const COutPoint& b)
     {
         return (a.hash == b.hash && a.n == b.n);
@@ -125,8 +153,15 @@ public:
         nSequence = ~(uint32_t)0;
     }
 
-    explicit CTxIn(COutPoint prevoutIn, CScript scriptSigIn=CScript(), uint32_t nSequenceIn=~(uint32_t)0);
-    CTxIn(uint256 hashPrevTx, uint32_t nOut, CScript scriptSigIn=CScript(), uint32_t nSequenceIn=~(uint32_t)0);
+    explicit CTxIn(COutPoint prevoutIn,
+                   CScript scriptSigIn=CScript(),
+                   uint32_t nSequenceIn=~(uint32_t)0);
+
+    CTxIn(uint256 hashPrevTx,
+          uint32_t nOut,
+          CScript scriptSigIn=CScript(),
+          uint32_t nSequenceIn=~(uint32_t)0,
+          CAssetID assetIDIn=CAssetID());
 
     ADD_SERIALIZE_METHODS;
 
@@ -155,23 +190,6 @@ public:
     std::string ToString() const;
 };
 
-/**
- *  Native Asset Issuance
- *
- *  An asset identifier tag, a 256 bits serialized hash (sha256) of the asset
- *  definition transaction from which the output’s coins are derived. Each output contains
- *  coins from a single asset/currency. For the host currency, the similarly-calculated
- *  hash of the chain’s genesis block is used instead. Within an asset
- *  definition transaction, the asset being defined is identified with 0 as a hash.
- */
-typedef uint256 CAssetID;
-
-typedef std::map<CAssetID, CAmount> CAmountMap;
-
-bool operator<(const CAmountMap& a, const CAmountMap& b);
-CAmountMap& operator+=(CAmountMap& a, const CAmountMap& b);
-CAmountMap& operator-=(CAmountMap& a, const CAmountMap& b);
-
 /** An output of a transaction.  It contains the public key that the next input
  * must be able to sign with to claim it.
  */
@@ -179,8 +197,8 @@ class CTxOut
 {
 public:
     CTxOutValue nValue;
-    CAssetID assetID;
     CScript scriptPubKey;
+    CAssetID assetID;
 
     CTxOut()
     {

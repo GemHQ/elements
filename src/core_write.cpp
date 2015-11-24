@@ -107,6 +107,8 @@ void TxToUniv(const CTransaction& tx, const uint256& hashBlock, UniValue& entry)
         else {
             in.pushKV("txid", txin.prevout.hash.GetHex());
             in.pushKV("vout", (int64_t)txin.prevout.n);
+            in.pushKV("assetID", txin.prevout.assetID.ToString());
+
             UniValue o(UniValue::VOBJ);
             o.pushKV("asm", txin.scriptSig.ToString());
             o.pushKV("hex", HexStr(txin.scriptSig.begin(), txin.scriptSig.end()));
@@ -130,6 +132,7 @@ void TxToUniv(const CTransaction& tx, const uint256& hashBlock, UniValue& entry)
         }
         // TODO: Non-Amount values
         out.pushKV("n", (int64_t)i);
+        out.pushKV("assetID", txout.assetID.ToString());
 
         UniValue o(UniValue::VOBJ);
         ScriptPubKeyToUniv(txout.scriptPubKey, o, true);

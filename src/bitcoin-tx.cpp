@@ -32,6 +32,11 @@ static bool fCreateBlank;
 static map<string,UniValue> registers;
 CClientUIInterface uiInterface;
 
+inline CAssetID DefaultFeeAssetId()
+{
+    return CAssetID(Params().HashGenesisBlock());
+}
+
 static bool AppInitRawTx(int argc, char* argv[])
 {
     //
@@ -243,7 +248,7 @@ static void MutateTxAddInput(CMutableTransaction& tx, const string& strInput)
     if ((lenSeq == string::npos) ||
         (lenSeq >= strInput.size() - 1)) { // no assetid given
         strSeq = strInput.substr(pos, string::npos);
-        assetID = CAssetID(Params().HashGenesisBlock());
+        assetID = DefaultFeeAssetId();
     } else {
         strSeq = strInput.substr(pos, lenSeq);
         pos += lenSeq + 1;
@@ -271,7 +276,7 @@ static void MutateTxAddInput(CMutableTransaction& tx, const string& strInput)
     tx.SetFeesFromTxRewardMap(mTxReward);
 
     // append to transaction input list
-    CTxIn txin(txid, vout, CScript(), nSequence);
+    CTxIn txin(txid, vout, CScript(), nSequence, assetID);
     tx.vin.push_back(txin);
 }
 
@@ -311,9 +316,8 @@ static void MutateTxAddOutAddr(CMutableTransaction& tx, const string& strInput)
         strAsset = strInput.substr(posAsset + 1, string::npos);
         assetID = CAssetID(uint256(strAsset));
     } else {
-        // No ASSETID supplied, use the hash of the genesis block
-        // (which is the assetID of the hostcoin)
-        assetID = CAssetID(Params().HashGenesisBlock());
+        // No ASSETID supplied, assume hostcoin
+        assetID = DefaultFeeAssetId();
     }
 
     // build standard output script via GetScriptForDestination()
