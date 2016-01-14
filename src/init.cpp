@@ -364,7 +364,7 @@ std::string HelpMessage(HelpMessageMode mode)
         strUsage += "  -maxsigcachesize=<n>   " + strprintf(_("Limit size of signature cache to <n> entries (default: %u)"), 50000) + "\n";
     }
     strUsage += "  -minrelaytxfee=<amt>   " + strprintf(_("Fees (in BTC/Kb) smaller than this are considered zero fee for relaying (default: %s)"), FormatMoney(::minRelayTxFee.GetFeePerK())) + "\n";
-    strUsage += "  -feeasset              " + strprintf(_("Asset id (in hex) used to compute fees in policy decisions (default: %u)"), DefaultFeeAssetIdStr()) + "\n";
+    strUsage += "  -feeasset              " + _("Asset id (in hex) used to compute fees in policy decisions") + "\n";
     strUsage += "  -printtoconsole        " + _("Send trace/debug info to console instead of debug.log file") + "\n";
     if (GetBoolArg("-help-debug", false))
     {
